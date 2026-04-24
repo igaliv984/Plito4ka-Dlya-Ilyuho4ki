@@ -1,0 +1,29 @@
+---
+import BaseLayout from "@/layouts/BaseLayout.astro";
+import { getSiteData } from "@/lib/google-sheets";
+
+const { settings } = await getSiteData();
+---
+
+<BaseLayout
+  seo={{
+    title: `Заявка отправлена | ${settings.storeName}`,
+    description: "Спасибо! Мы получили заявку и скоро свяжемся с вами.",
+    canonicalPath: "/success/",
+    noindex: true
+  }}
+>
+  <section class="container-shell py-20">
+    <div class="surface-card mx-auto max-w-3xl p-10 text-center">
+      <span class="section-kicker">Спасибо</span>
+      <h1 class="mt-4 text-5xl">Заявка отправлена</h1>
+      <p class="mt-4 text-lg leading-8 text-stoneInk/70">
+        Мы получили ваше сообщение и свяжемся с вами в ближайшее рабочее время. Если вопрос срочный, можно позвонить сразу.
+      </p>
+      <div class="mt-8 flex flex-col justify-center gap-3 sm:flex-row">
+        <a href={`tel:${settings.phone.replace(/[^\d+]/g, "")}`} class="btn-primary">Позвонить</a>
+        <a href="/catalog/" class="btn-secondary">Вернуться в каталог</a>
+      </div>
+    </div>
+  </section>
+</BaseLayout>

@@ -1,0 +1,57 @@
+---
+import type { Settings } from "@/lib/types";
+
+interface Props {
+  settings: Settings;
+}
+
+const { settings } = Astro.props;
+---
+
+<footer class="mt-20 border-t border-stoneInk/8 bg-stoneInk text-white">
+  <div class="container-shell grid gap-10 py-12 lg:grid-cols-[1.4fr,1fr,1fr]">
+    <div class="space-y-4">
+      <p class="font-display text-3xl">{settings.storeName}</p>
+      <p class="max-w-xl text-sm leading-7 text-white/70">
+        Быстрый статический каталог плитки с расчётом стоимости, заявками и фокусом на понятный путь к покупке без корзины.
+      </p>
+      <div class="flex flex-wrap gap-3">
+        <a href="/catalog/" class="btn-secondary border-white/15 bg-white/5 text-white hover:border-sand-400 hover:text-white">
+          Перейти в каталог
+        </a>
+        <a href="/calculator/" class="btn-secondary border-white/15 bg-white/5 text-white hover:border-sand-400 hover:text-white">
+          Открыть калькулятор
+        </a>
+      </div>
+    </div>
+
+    <div>
+      <p class="mb-4 text-sm font-semibold uppercase tracking-[0.24em] text-white/45">Разделы</p>
+      <div class="space-y-3 text-sm text-white/75">
+        <a class="block hover:text-white" href="/about/">О нас</a>
+        <a class="block hover:text-white" href="/delivery-payment/">Доставка и оплата</a>
+        <a class="block hover:text-white" href="/faq/">FAQ</a>
+        <a class="block hover:text-white" href="/privacy-policy/">Политика конфиденциальности</a>
+      </div>
+    </div>
+
+    <div>
+      <p class="mb-4 text-sm font-semibold uppercase tracking-[0.24em] text-white/45">Контакты</p>
+      <div class="space-y-3 text-sm text-white/75">
+        <a class="block hover:text-white" href={`tel:${settings.phone.replace(/[^\d+]/g, "")}`}>{settings.phone}</a>
+        <a class="block hover:text-white" href={`mailto:${settings.email}`}>{settings.email}</a>
+        <p>{settings.address}</p>
+        <p>{settings.workingHours}</p>
+      </div>
+      <div class="mt-5 flex flex-wrap gap-3">
+        {
+          settings.socialLinks.map((item) => (
+            <a href={item.url} target="_blank" rel="noreferrer" class="text-sm font-medium text-sand-300 hover:text-white">
+              {item.label}
+            </a>
+          ))
+        }
+      </div>
+    </div>
+  </div>
+</footer>

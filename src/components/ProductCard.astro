@@ -1,0 +1,121 @@
+---
+import type { Product, Settings } from "@/lib/types";
+
+interface Props {
+  product: Product;
+  settings: Settings;
+}
+
+const { product, settings } = Astro.props;
+const formatter = new Intl.NumberFormat("ru-RU");
+const hasPrice = product.priceM2 > 0;
+
+function normalizeCtaLabel(item: Product): string {
+  const raw = (item.callToActionText || "").trim();
+  const normalized = raw
+    .replace(item.name, "")
+    .replace(item.collection, "")
+    .replace(/\s{2,}/g, " ")
+    .replace(/\s+(по|на)\s*$/i, "")
+    .trim();
+
+  if (!normalized) {
+    return "Оставить заявку";
+  }
+
+  const lower = normalized.toLowerCase();
+
+  if (lower.includes("налич")) {
+    return "Уточнить наличие";
+  }
+
+  if (lower.includes("расч")) {
+    return "Запросить расчет";
+  }
+
+  if (lower.includes("предлож")) {
+    return "Получить предложение";
+  }
+
+  if (lower.includes("заяв")) {
+    return "Оставить заявку";
+  }
+
+  return normalized.length > 24 ? "Оставить заявку" : normalized;
+}
+
+const ctaLabel = normalizeCtaLabel(product);
+---
+
+<article
+  class="surface-card overflow-hidden"
+  data-product-card
+  data-category={product.category}
+  data-collection={product.collection}
+  data-size={product.sizeLabel}
+  data-color={product.color}
+  data-style={product.style}
+  data-surface={product.surface}
+  data-price={product.priceM2}
+  data-name={product.name.toLowerCase()}
+>
+  <a href={`/product/${product.slug}/`} class="block overflow-hidden">
+    <img
+      src={product.mainImage}
+      alt={product.altText}
+      loading="lazy"
+      class="h-72 w-full object-cover transition duration-500 hover:scale-[1.03]"
+    />
+  </a>
+  <div class="space-y-4 p-6">
+    <div class="flex flex-wrap items-center gap-2 text-xs font-semibold uppercase tracking-[0.22em] text-stoneInk/45">
+      <span>{product.collection}</span>
+      {product.sizeLabel && (
+        <>
+          <span>•</span>
+          <span>{product.sizeLabel}</span>
+        </>
+      )}
+      {!product.inStock && <span class="rounded-full bg-clay/10 px-2 py-1 tracking-normal text-clay">Под заказ</span>}
+    </div>
+
+    <div class="flex items-start justify-between gap-4">
+      <div>
+        <h3 class="text-2xl">{product.name}</h3>
+        <p class="mt-2 text-sm leading-7 text-stoneInk/65">{product.shortDescription}</p>
+      </div>
+      <div class="shrink-0 text-right">
+        {hasPrice && product.oldPriceM2 && product.oldPriceM2 > product.priceM2 && (
+          <p class="text-sm text-stoneInk/35 line-through">
+            {formatter.format(product.oldPriceM2)} {settings.currency}
+          </p>
+        )}
+        {hasPrice ? (
+          <>
+            <p class="text-2xl font-semibold text-stoneInk">
+              {formatter.format(product.priceM2)} {settings.currency}
+            </p>
+            <p class="text-xs text-stoneInk/45">за м²</p>
+          </>
+        ) : (
+          <>
+            <p class="text-xl font-semibold text-stoneInk">По запросу</p>
+            <p class="text-xs text-stoneInk/45">цену уточняем после заявки</p>
+          </>
+        )}
+      </div>
+    </div>
+
+    <div class="flex flex-wrap gap-2 text-xs text-stoneInk/50">
+      {product.color && <span class="rounded-full bg-fog px-3 py-1">{product.color}</span>}
+      {product.style && <span class="rounded-full bg-fog px-3 py-1">{product.style}</span>}
+      {product.surface && <span class="rounded-full bg-fog px-3 py-1">{product.surface}</span>}
+      {product.brand && <span class="rounded-full bg-fog px-3 py-1">{product.brand}</span>}
+    </div>
+
+    <div class="flex flex-col gap-3 sm:flex-row">
+      <a href={`/product/${product.slug}/`} class="btn-secondary flex-1">Подробнее</a>
+      <a href={`/product/${product.slug}/#lead-form`} class="btn-primary flex-1">{ctaLabel}</a>
+    </div>
+  </div>
+</article>

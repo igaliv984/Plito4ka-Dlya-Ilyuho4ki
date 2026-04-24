@@ -1,0 +1,22 @@
+{
+  "storeName": "Kerama Luxe",
+  "phone": "+7 (495) 123-45-67",
+  "whatsapp": "+74951234567",
+  "email": "hello@keramaluxe.ru",
+  "address": "Москва, Ленинский проспект, 45",
+  "workingHours": "Пн-Сб: 10:00-20:00, Вс: 11:00-18:00",
+  "currency": "₽",
+  "defaultWastePercent": 10,
+  "mapLink": "https://yandex.ru/maps/",
+  "mapEmbedUrl": "https://yandex.ru/map-widget/v1/?text=%D0%9C%D0%BE%D1%81%D0%BA%D0%B2%D0%B0%2C%20%D0%9B%D0%B5%D0%BD%D0%B8%D0%BD%D1%81%D0%BA%D0%B8%D0%B9%20%D0%BF%D1%80%D0%BE%D1%81%D0%BF%D0%B5%D0%BA%D1%82%2C%2045&z=16",
+  "socialLinks": [
+    {
+      "label": "Telegram",
+      "url": "https://t.me/keramaluxe"
+    },
+    {
+      "label": "WhatsApp",
+      "url": "https://wa.me/74951234567"
+    }
+  ]
+}

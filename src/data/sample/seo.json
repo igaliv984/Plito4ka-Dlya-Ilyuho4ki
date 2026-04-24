@@ -1,0 +1,42 @@
+[
+  {
+    "pageKey": "home",
+    "title": "Kerama Luxe | Каталог плитки и керамогранита",
+    "description": "Современный каталог плитки без корзины: быстрый выбор, фильтры, калькулятор, заявка и звонок.",
+    "h1": "Плитка и керамогранит для интерьеров, террас и коммерческих проектов",
+    "canonicalPath": "/",
+    "ogImage": "https://images.unsplash.com/photo-1505693416388-ac5ce068fe85?auto=format&fit=crop&w=1200&q=80"
+  },
+  {
+    "pageKey": "catalog",
+    "title": "Каталог плитки | Kerama Luxe",
+    "description": "Каталог плитки и керамогранита с фильтрами по категории, коллекции, стилю, цвету и цене.",
+    "h1": "Каталог плитки",
+    "canonicalPath": "/catalog/",
+    "ogImage": "https://images.unsplash.com/photo-1484154218962-a197022b5858?auto=format&fit=crop&w=1200&q=80"
+  },
+  {
+    "pageKey": "faq",
+    "title": "Часто задаваемые вопросы | Kerama Luxe",
+    "description": "Ответы на популярные вопросы о расчёте плитки, доставке, наличии и оформлении заявки.",
+    "h1": "Часто задаваемые вопросы",
+    "canonicalPath": "/faq/",
+    "ogImage": "https://images.unsplash.com/photo-1494526585095-c41746248156?auto=format&fit=crop&w=1200&q=80"
+  },
+  {
+    "pageKey": "calculator",
+    "title": "Калькулятор плитки | Kerama Luxe",
+    "description": "Рассчитайте площадь, запас на подрезку, количество плитки, коробок и итоговую стоимость.",
+    "h1": "Калькулятор плитки",
+    "canonicalPath": "/calculator/",
+    "ogImage": "https://images.unsplash.com/photo-1460317442991-0ec209397118?auto=format&fit=crop&w=1200&q=80"
+  },
+  {
+    "pageKey": "404",
+    "title": "Страница не найдена | Kerama Luxe",
+    "description": "Похоже, такой страницы нет. Вернитесь в каталог или на главную.",
+    "h1": "Страница не найдена",
+    "canonicalPath": "/404/",
+    "ogImage": "https://images.unsplash.com/photo-1505693416388-ac5ce068fe85?auto=format&fit=crop&w=1200&q=80"
+  }
+]

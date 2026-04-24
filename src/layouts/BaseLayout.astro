@@ -1,0 +1,60 @@
+---
+import Footer from "@/components/Footer.astro";
+import Header from "@/components/Header.astro";
+import { getSiteData } from "@/lib/google-sheets";
+import type { SeoProps } from "@/lib/types";
+import "@/styles/global.css";
+
+interface Props {
+  seo: SeoProps;
+  schema?: Record<string, unknown> | Array<Record<string, unknown>>;
+}
+
+const { seo, schema } = Astro.props;
+const { settings } = await getSiteData();
+const baseUrl = Astro.site ?? new URL("https://example-tile-store.netlify.app");
+const canonicalUrl = new URL(seo.canonicalPath ?? Astro.url.pathname, baseUrl).toString();
+const imageUrl = seo.image ? new URL(seo.image, baseUrl).toString() : undefined;
+const schemaList = schema ? (Array.isArray(schema) ? schema : [schema]) : [];
+---
+
+<!doctype html>
+<html lang="ru">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>{seo.title}</title>
+    <meta name="description" content={seo.description} />
+    <meta name="generator" content={Astro.generator} />
+    <meta name="theme-color" content="#111316" />
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+    <link rel="canonical" href={canonicalUrl} />
+
+    {seo.noindex && <meta name="robots" content="noindex,nofollow" />}
+
+    <meta property="og:type" content="website" />
+    <meta property="og:title" content={seo.title} />
+    <meta property="og:description" content={seo.description} />
+    <meta property="og:url" content={canonicalUrl} />
+    <meta property="og:site_name" content={settings.storeName} />
+    {imageUrl && <meta property="og:image" content={imageUrl} />}
+
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content={seo.title} />
+    <meta name="twitter:description" content={seo.description} />
+    {imageUrl && <meta name="twitter:image" content={imageUrl} />}
+
+    {
+      schemaList.map((entry) => (
+        <script type="application/ld+json" set:html={JSON.stringify(entry)} />
+      ))
+    }
+  </head>
+  <body>
+    <Header settings={settings} />
+    <main>
+      <slot />
+    </main>
+    <Footer settings={settings} />
+  </body>
+</html>

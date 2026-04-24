@@ -1,0 +1,229 @@
+---
+import InquiryForm from "@/components/InquiryForm.astro";
+import ProductCard from "@/components/ProductCard.astro";
+import TileCalculator from "@/components/TileCalculator.astro";
+import BaseLayout from "@/layouts/BaseLayout.astro";
+import { getFeaturedCategories, getFeaturedProducts, getSeoEntry } from "@/lib/content";
+import { homeBenefits, testimonials, trustPoints } from "@/lib/demo-content";
+import { getSiteData } from "@/lib/google-sheets";
+
+const data = await getSiteData();
+const featuredCategories = await getFeaturedCategories(3);
+const featuredProducts = await getFeaturedProducts(6);
+const seoEntry = await getSeoEntry("home");
+
+const seo = {
+  title: seoEntry?.title ?? `${data.settings.storeName} | Каталог плитки`,
+  description: seoEntry?.description ?? "Каталог плитки с калькулятором и заявкой на сайте.",
+  h1: seoEntry?.h1,
+  canonicalPath: seoEntry?.canonicalPath ?? "/",
+  image: seoEntry?.ogImage
+};
+
+const schema = [
+  {
+    "@context": "https://schema.org",
+    "@type": "LocalBusiness",
+    name: data.settings.storeName,
+    telephone: data.settings.phone,
+    email: data.settings.email,
+    address: {
+      "@type": "PostalAddress",
+      streetAddress: data.settings.address
+    },
+    openingHours: data.settings.workingHours,
+    url: Astro.site?.toString() ?? "https://example-tile-store.netlify.app"
+  },
+  {
+    "@context": "https://schema.org",
+    "@type": "WebSite",
+    name: data.settings.storeName,
+    url: Astro.site?.toString() ?? "https://example-tile-store.netlify.app"
+  }
+];
+---
+
+<BaseLayout seo={seo} schema={schema}>
+  <section class="container-shell pt-10">
+    <div class="grid gap-8 rounded-[2.5rem] bg-hero-radial px-6 py-10 sm:px-8 md:px-10 lg:grid-cols-[1.15fr,0.85fr] lg:px-14 lg:py-16">
+      <div class="space-y-8">
+        <span class="section-kicker">Быстрый выбор и расчёт</span>
+        <div class="max-w-3xl space-y-5">
+          <h1 class="text-5xl leading-tight sm:text-6xl">{seo.h1}</h1>
+          <p class="max-w-2xl text-lg leading-8 text-stoneInk/72">
+            Современный каталог без корзины и лишних шагов: смотрите коллекции, считайте стоимость и оставляйте заявку по
+            конкретной плитке за пару минут.
+          </p>
+        </div>
+
+        <div class="flex flex-col gap-3 sm:flex-row">
+          <a href="/catalog/" class="btn-primary">Открыть каталог</a>
+          <a href="#lead-form" class="btn-secondary">Оставить заявку</a>
+          <a href={`tel:${data.settings.phone.replace(/[^\d+]/g, "")}`} class="btn-secondary">Позвонить</a>
+        </div>
+
+        <div class="grid gap-4 sm:grid-cols-3">
+          <div class="surface-card p-5">
+            <p class="text-sm text-stoneInk/50">Коллекций в каталоге</p>
+            <p class="mt-2 text-3xl font-semibold">{data.products.length}+</p>
+          </div>
+          <div class="surface-card p-5">
+            <p class="text-sm text-stoneInk/50">Среднее время до заявки</p>
+            <p class="mt-2 text-3xl font-semibold">до 5 мин</p>
+          </div>
+          <div class="surface-card p-5">
+            <p class="text-sm text-stoneInk/50">Фокус</p>
+            <p class="mt-2 text-3xl font-semibold">лид и звонок</p>
+          </div>
+        </div>
+      </div>
+
+      <div class="surface-card overflow-hidden">
+        <img
+          src="https://images.unsplash.com/photo-1505693416388-ac5ce068fe85?auto=format&fit=crop&w=1400&q=80"
+          alt="Современный интерьер с плиткой и керамогранитом"
+          class="h-full min-h-[380px] w-full object-cover"
+        />
+      </div>
+    </div>
+  </section>
+
+  <section class="container-shell mt-20">
+    <div class="grid gap-6 lg:grid-cols-3">
+      {
+        trustPoints.map((item) => (
+          <div class="surface-card p-7">
+            <p class="text-lg font-semibold">{item.title}</p>
+            <p class="mt-3 text-sm leading-7 text-stoneInk/65">{item.text}</p>
+          </div>
+        ))
+      }
+    </div>
+  </section>
+
+  <section class="container-shell mt-20">
+    <div class="mb-8 flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
+      <div>
+        <span class="section-kicker">Популярные категории</span>
+        <h2 class="mt-4 text-4xl">Категории, с которых чаще всего начинают выбор</h2>
+      </div>
+      <a href="/catalog/" class="btn-secondary">Смотреть весь каталог</a>
+    </div>
+
+    <div class="grid gap-6 lg:grid-cols-3">
+      {
+        featuredCategories.map((category) => (
+          <a href={`/catalog/${category.slug}/`} class="surface-card overflow-hidden">
+            <img src={category.image} alt={category.name} class="h-64 w-full object-cover" loading="lazy" />
+            <div class="space-y-3 p-6">
+              <p class="text-xs font-semibold uppercase tracking-[0.24em] text-sand-700">Категория</p>
+              <h3 class="text-3xl">{category.name}</h3>
+              <p class="text-sm leading-7 text-stoneInk/65">{category.description}</p>
+            </div>
+          </a>
+        ))
+      }
+    </div>
+  </section>
+
+  <section class="container-shell mt-20">
+    <TileCalculator
+      products={data.products}
+      settings={data.settings}
+      title="Калькулятор плитки прямо на главной"
+      description="Покупатель может быстро посчитать площадь помещения, запас на подрезку, примерное количество плитки, число коробок и итоговую стоимость."
+    />
+  </section>
+
+  <section class="container-shell mt-20">
+    <div class="grid gap-8 lg:grid-cols-[0.9fr,1.1fr]">
+      <div class="surface-card p-8">
+        <span class="section-kicker">Почему это удобно</span>
+        <h2 class="mt-4 text-4xl">Дорогой вид, простая логика и короткий путь к обращению</h2>
+        <ul class="mt-6 space-y-4 text-base leading-8 text-stoneInk/70">
+          {homeBenefits.map((item) => <li class="list-disc pl-2">{item}</li>)}
+        </ul>
+      </div>
+
+      <div class="surface-card p-8">
+        <div class="mb-6 flex items-end justify-between gap-4">
+          <div>
+            <span class="section-kicker">Социальное доказательство</span>
+            <h2 class="mt-4 text-4xl">Отзывы и подтверждение доверия</h2>
+          </div>
+        </div>
+        <div class="grid gap-4">
+          {
+            testimonials.map((item) => (
+              <div class="rounded-[1.75rem] bg-fog p-6">
+                <p class="text-base leading-8 text-stoneInk/72">“{item.quote}”</p>
+                <p class="mt-4 text-sm font-semibold text-stoneInk">{item.name}</p>
+              </div>
+            ))
+          }
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="container-shell mt-20">
+    <div class="mb-8 flex items-end justify-between gap-4">
+      <div>
+        <span class="section-kicker">Популярные товары</span>
+        <h2 class="mt-4 text-4xl">Карточки с быстрым переходом к расчёту и заявке</h2>
+      </div>
+      <a href="/catalog/" class="btn-secondary">Весь каталог</a>
+    </div>
+    <div class="grid gap-6 md:grid-cols-2 xl:grid-cols-3">
+      {featuredProducts.map((product) => <ProductCard product={product} settings={data.settings} />)}
+    </div>
+  </section>
+
+  <section class="container-shell mt-20">
+    <div class="grid gap-6 lg:grid-cols-[1fr,0.9fr]">
+      <div class="surface-card p-8">
+        <span class="section-kicker">Контакты</span>
+        <h2 class="mt-4 text-4xl">Приезжайте в салон или свяжитесь удобным способом</h2>
+        <div class="mt-6 grid gap-5 md:grid-cols-2">
+          <div class="rounded-[1.5rem] bg-fog p-5">
+            <p class="text-sm text-stoneInk/50">Телефон</p>
+            <a href={`tel:${data.settings.phone.replace(/[^\d+]/g, "")}`} class="mt-2 block text-2xl font-semibold">
+              {data.settings.phone}
+            </a>
+          </div>
+          <div class="rounded-[1.5rem] bg-fog p-5">
+            <p class="text-sm text-stoneInk/50">E-mail</p>
+            <a href={`mailto:${data.settings.email}`} class="mt-2 block text-2xl font-semibold">
+              {data.settings.email}
+            </a>
+          </div>
+          <div class="rounded-[1.5rem] bg-fog p-5 md:col-span-2">
+            <p class="text-sm text-stoneInk/50">Адрес и часы</p>
+            <p class="mt-2 text-lg font-semibold">{data.settings.address}</p>
+            <p class="mt-2 text-stoneInk/65">{data.settings.workingHours}</p>
+          </div>
+        </div>
+      </div>
+
+      <div class="surface-card overflow-hidden">
+        <div class="flex h-full flex-col justify-between p-8">
+          <div>
+            <span class="section-kicker">CTA</span>
+            <h2 class="mt-4 text-4xl">Оставить заявку или позвонить сейчас</h2>
+            <p class="mt-4 text-base leading-8 text-stoneInk/70">
+              На каждом ключевом экране есть понятная точка входа в обращение. Это главный сценарий конверсии для такого каталога.
+            </p>
+          </div>
+          <div class="mt-10 flex flex-col gap-3 sm:flex-row">
+            <a href="#lead-form" class="btn-primary">Оставить заявку</a>
+            <a href={data.settings.mapLink} target="_blank" rel="noreferrer" class="btn-secondary">Открыть карту</a>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="container-shell mt-20">
+    <InquiryForm settings={data.settings} title="Оставьте заявку и получите подборку под ваш проект" />
+  </section>
+</BaseLayout>

@@ -1,0 +1,239 @@
+---
+import type { Product, Settings } from "@/lib/types";
+
+interface Props {
+  products?: Product[];
+  product?: Product;
+  settings: Settings;
+  title?: string;
+  description?: string;
+}
+
+const { products = [], product, settings, title = "Калькулятор плитки", description } = Astro.props;
+const catalog = product ? [product] : products;
+const fallbackDescription =
+  "Введите размеры помещения, задайте запас на подрезку и посмотрите расчёт площади, количества плитки, коробок и итоговой стоимости.";
+---
+
+<section class="surface-card p-6 md:p-8" data-calculator-root>
+  <div class="mb-8 flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
+    <div class="max-w-2xl">
+      <span class="section-kicker">Расчёт</span>
+      <h2 class="mt-4 text-3xl md:text-4xl">{title}</h2>
+      <p class="mt-4 text-base leading-8 text-stoneInk/70">{description ?? fallbackDescription}</p>
+    </div>
+    {!product && <p class="text-sm text-stoneInk/45">Без backend. Все вычисления выполняются прямо в браузере.</p>}
+  </div>
+
+  <div class="grid gap-8 xl:grid-cols-[1.1fr,0.9fr]">
+    <div class="grid gap-4 md:grid-cols-2">
+      {!product && (
+        <div class="md:col-span-2">
+          <label class="label" for="calc-product">Товар</label>
+          <select id="calc-product" class="field" data-calc-product>
+            {catalog.map((item) => <option value={item.slug}>{item.name}</option>)}
+          </select>
+        </div>
+      )}
+
+      <div>
+        <label class="label" for="calc-length">Длина помещения, м</label>
+        <input id="calc-length" class="field" data-calc-length type="number" min="0" step="0.1" value="3.2" />
+      </div>
+      <div>
+        <label class="label" for="calc-width">Ширина помещения, м</label>
+        <input id="calc-width" class="field" data-calc-width type="number" min="0" step="0.1" value="2.8" />
+      </div>
+      <div>
+        <label class="label" for="calc-waste">Запас на подрезку, %</label>
+        <input
+          id="calc-waste"
+          class="field"
+          data-calc-waste
+          type="number"
+          min="0"
+          max="30"
+          step="1"
+          value={settings.defaultWastePercent}
+        />
+      </div>
+      <div>
+        <label class="label" for="calc-price">Цена за м², {settings.currency}</label>
+        <input
+          id="calc-price"
+          class="field"
+          data-calc-price
+          type="number"
+          min="0"
+          step="1"
+          value={product?.priceM2 ?? catalog[0]?.priceM2 ?? 0}
+        />
+      </div>
+      <div>
+        <label class="label" for="calc-tile-length">Длина плитки, мм</label>
+        <input
+          id="calc-tile-length"
+          class="field"
+          data-calc-tile-length
+          type="number"
+          min="1"
+          step="1"
+          value={product?.tileLengthMm ?? catalog[0]?.tileLengthMm ?? 600}
+        />
+      </div>
+      <div>
+        <label class="label" for="calc-tile-width">Ширина плитки, мм</label>
+        <input
+          id="calc-tile-width"
+          class="field"
+          data-calc-tile-width
+          type="number"
+          min="1"
+          step="1"
+          value={product?.tileWidthMm ?? catalog[0]?.tileWidthMm ?? 600}
+        />
+      </div>
+      <div>
+        <label class="label" for="calc-pieces-box">Плиток в коробке</label>
+        <input
+          id="calc-pieces-box"
+          class="field"
+          data-calc-pieces-box
+          type="number"
+          min="1"
+          step="1"
+          value={product?.piecesPerBox ?? catalog[0]?.piecesPerBox ?? 1}
+        />
+      </div>
+      <div>
+        <label class="label" for="calc-box-area">Площадь коробки, м²</label>
+        <input
+          id="calc-box-area"
+          class="field"
+          data-calc-box-area
+          type="number"
+          min="0"
+          step="0.01"
+          value={product?.boxAreaM2 ?? catalog[0]?.boxAreaM2 ?? 0}
+        />
+      </div>
+    </div>
+
+    <div class="rounded-[1.75rem] bg-stoneInk p-6 text-white">
+      <p class="text-sm uppercase tracking-[0.24em] text-white/45">Результат</p>
+      <div class="mt-6 grid gap-4 sm:grid-cols-2">
+        <div class="rounded-3xl bg-white/5 p-5">
+          <p class="text-sm text-white/55">Площадь помещения</p>
+          <p class="mt-2 text-3xl font-semibold" data-result-area>0 м²</p>
+        </div>
+        <div class="rounded-3xl bg-white/5 p-5">
+          <p class="text-sm text-white/55">Площадь с запасом</p>
+          <p class="mt-2 text-3xl font-semibold" data-result-area-waste>0 м²</p>
+        </div>
+        <div class="rounded-3xl bg-white/5 p-5">
+          <p class="text-sm text-white/55">Примерно плиток</p>
+          <p class="mt-2 text-3xl font-semibold" data-result-pieces>0 шт.</p>
+        </div>
+        <div class="rounded-3xl bg-white/5 p-5">
+          <p class="text-sm text-white/55">Коробок</p>
+          <p class="mt-2 text-3xl font-semibold" data-result-boxes>0 шт.</p>
+        </div>
+      </div>
+
+      <div class="mt-4 rounded-3xl bg-sand-500/15 p-5">
+        <p class="text-sm text-white/65">Итоговая стоимость</p>
+        <p class="mt-2 text-4xl font-semibold text-sand-200" data-result-total>0 {settings.currency}</p>
+      </div>
+      <p class="mt-4 text-sm leading-7 text-white/55">
+        Формулы: area = length × width, areaWithWaste = area × (1 + waste / 100), piecesNeeded = ceil(areaWithWaste / tileArea), boxesNeeded = ceil(piecesNeeded / piecesPerBox), totalPrice = areaWithWaste × pricePerM2.
+      </p>
+    </div>
+  </div>
+</section>
+
+<script
+  is:inline
+  define:vars={{
+    products: catalog,
+    presetSlug: product?.slug ?? catalog[0]?.slug ?? null,
+    currency: settings.currency
+  }}
+>
+  const formatNumber = (value, digits = 2) =>
+    new Intl.NumberFormat("ru-RU", {
+      minimumFractionDigits: 0,
+      maximumFractionDigits: digits
+    }).format(value);
+
+  const catalogMap = new Map(products.map((item) => [item.slug, item]));
+
+  document.querySelectorAll("[data-calculator-root]").forEach((root) => {
+    const select = root.querySelector("[data-calc-product]");
+    const lengthInput = root.querySelector("[data-calc-length]");
+    const widthInput = root.querySelector("[data-calc-width]");
+    const wasteInput = root.querySelector("[data-calc-waste]");
+    const priceInput = root.querySelector("[data-calc-price]");
+    const tileLengthInput = root.querySelector("[data-calc-tile-length]");
+    const tileWidthInput = root.querySelector("[data-calc-tile-width]");
+    const piecesPerBoxInput = root.querySelector("[data-calc-pieces-box]");
+    const boxAreaInput = root.querySelector("[data-calc-box-area]");
+
+    const areaResult = root.querySelector("[data-result-area]");
+    const areaWasteResult = root.querySelector("[data-result-area-waste]");
+    const piecesResult = root.querySelector("[data-result-pieces]");
+    const boxesResult = root.querySelector("[data-result-boxes]");
+    const totalResult = root.querySelector("[data-result-total]");
+
+    const syncProductFields = () => {
+      const selectedSlug = select?.value ?? presetSlug;
+      const current = catalogMap.get(selectedSlug);
+
+      if (!current) {
+        return;
+      }
+
+      priceInput.value = current.priceM2;
+      tileLengthInput.value = current.tileLengthMm;
+      tileWidthInput.value = current.tileWidthMm;
+      piecesPerBoxInput.value = current.piecesPerBox;
+      boxAreaInput.value = current.boxAreaM2 ?? 0;
+    };
+
+    const calculate = () => {
+      const length = Number(lengthInput.value) || 0;
+      const width = Number(widthInput.value) || 0;
+      const wastePercent = Number(wasteInput.value) || 0;
+      const pricePerM2 = Number(priceInput.value) || 0;
+      const tileLength = (Number(tileLengthInput.value) || 0) / 1000;
+      const tileWidth = (Number(tileWidthInput.value) || 0) / 1000;
+      const piecesPerBox = Number(piecesPerBoxInput.value) || 1;
+
+      const area = length * width;
+      const areaWithWaste = area * (1 + wastePercent / 100);
+      const tileArea = tileLength * tileWidth;
+      const piecesNeeded = tileArea > 0 ? Math.ceil(areaWithWaste / tileArea) : 0;
+      const boxesNeeded = Math.ceil(piecesNeeded / piecesPerBox);
+      const totalPrice = areaWithWaste * pricePerM2;
+
+      areaResult.textContent = `${formatNumber(area)} м²`;
+      areaWasteResult.textContent = `${formatNumber(areaWithWaste)} м²`;
+      piecesResult.textContent = `${formatNumber(piecesNeeded, 0)} шт.`;
+      boxesResult.textContent = `${formatNumber(boxesNeeded, 0)} шт.`;
+      totalResult.textContent = `${formatNumber(totalPrice, 0)} ${currency}`;
+    };
+
+    if (select) {
+      select.addEventListener("change", () => {
+        syncProductFields();
+        calculate();
+      });
+      syncProductFields();
+    }
+
+    [lengthInput, widthInput, wasteInput, priceInput, tileLengthInput, tileWidthInput, piecesPerBoxInput].forEach((input) =>
+      input.addEventListener("input", calculate)
+    );
+
+    calculate();
+  });
+</script>

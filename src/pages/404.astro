@@ -1,0 +1,33 @@
+---
+import BaseLayout from "@/layouts/BaseLayout.astro";
+import { getSeoEntry } from "@/lib/content";
+import { getSiteData } from "@/lib/google-sheets";
+
+const data = await getSiteData();
+const seoEntry = await getSeoEntry("404");
+
+const seo = {
+  title: seoEntry?.title ?? "Страница не найдена",
+  description: seoEntry?.description ?? "Такой страницы не существует.",
+  h1: seoEntry?.h1 ?? "Страница не найдена",
+  canonicalPath: seoEntry?.canonicalPath ?? "/404/",
+  image: seoEntry?.ogImage,
+  noindex: true
+};
+---
+
+<BaseLayout seo={seo}>
+  <section class="container-shell py-20">
+    <div class="surface-card mx-auto max-w-3xl p-10 text-center">
+      <span class="section-kicker">404</span>
+      <h1 class="mt-4 text-5xl">{seo.h1}</h1>
+      <p class="mt-4 text-lg leading-8 text-stoneInk/70">
+        Похоже, нужная страница переехала или была удалена. Вернитесь в каталог или откройте главную.
+      </p>
+      <div class="mt-8 flex flex-col justify-center gap-3 sm:flex-row">
+        <a href="/" class="btn-primary">На главную</a>
+        <a href="/catalog/" class="btn-secondary">Открыть каталог</a>
+      </div>
+    </div>
+  </section>
+</BaseLayout>

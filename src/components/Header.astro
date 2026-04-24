@@ -1,0 +1,92 @@
+---
+import type { Settings } from "@/lib/types";
+
+interface Props {
+  settings: Settings;
+}
+
+const { settings } = Astro.props;
+const navItems = [
+  { href: "/", label: "Главная" },
+  { href: "/catalog/", label: "Каталог" },
+  { href: "/calculator/", label: "Калькулятор" },
+  { href: "/about/", label: "О компании" },
+  { href: "/faq/", label: "FAQ" }
+];
+const currentPath = Astro.url.pathname;
+---
+
+<header class="sticky top-0 z-40 border-b border-white/60 bg-fog/90 backdrop-blur">
+  <div class="container-shell flex items-center justify-between gap-4 py-4">
+    <a href="/" class="flex items-center gap-3" aria-label={settings.storeName}>
+      <span class="grid h-11 w-11 place-items-center rounded-2xl bg-stoneInk text-lg font-bold text-white">KL</span>
+      <span>
+        <span class="block font-display text-2xl leading-none">{settings.storeName}</span>
+        <span class="text-xs uppercase tracking-[0.24em] text-stoneInk/50">Каталог плитки</span>
+      </span>
+    </a>
+
+    <nav class="hidden items-center gap-6 xl:flex">
+      {
+        navItems.map((item) => (
+          <a
+            href={item.href}
+            class:list={[
+              "text-sm font-medium whitespace-nowrap",
+              currentPath === item.href ? "text-sand-700" : "text-stoneInk/70 hover:text-stoneInk"
+            ]}
+          >
+            {item.label}
+          </a>
+        ))
+      }
+    </nav>
+
+    <div class="hidden items-center gap-3 lg:flex">
+      <form action="/search/" method="GET" class="hidden xl:block">
+        <input
+          type="search"
+          name="q"
+          placeholder="Поиск по сайту"
+          class="field w-56 rounded-full py-2.5"
+        />
+      </form>
+      <a href={`tel:${settings.phone.replace(/[^\d+]/g, "")}`} class="text-sm font-semibold text-stoneInk whitespace-nowrap">
+        {settings.phone}
+      </a>
+      <a href="/#lead-form" class="btn-primary whitespace-nowrap">Оставить заявку</a>
+    </div>
+
+    <details class="relative lg:hidden">
+      <summary class="flex h-11 w-11 cursor-pointer list-none items-center justify-center rounded-2xl border border-stoneInk/10 bg-white text-stoneInk">
+        <span class="text-lg">≡</span>
+      </summary>
+      <div class="absolute right-0 mt-3 w-72 rounded-3xl border border-white/60 bg-white p-4 shadow-luxe">
+        <div class="space-y-1">
+          {
+            navItems.map((item) => (
+              <a
+                href={item.href}
+                class:list={[
+                  "block rounded-2xl px-4 py-3 text-sm font-medium",
+                  currentPath === item.href ? "bg-sand-100 text-sand-800" : "hover:bg-sand-50"
+                ]}
+              >
+                {item.label}
+              </a>
+            ))
+          }
+        </div>
+        <div class="mt-4 space-y-3 rounded-2xl bg-fog p-4">
+          <form action="/search/" method="GET">
+            <input type="search" name="q" placeholder="Поиск по сайту" class="field w-full" />
+          </form>
+          <a href={`tel:${settings.phone.replace(/[^\d+]/g, "")}`} class="block text-sm font-semibold text-stoneInk">
+            {settings.phone}
+          </a>
+          <a href="/#lead-form" class="btn-primary w-full">Оставить заявку</a>
+        </div>
+      </div>
+    </details>
+  </div>
+</header>

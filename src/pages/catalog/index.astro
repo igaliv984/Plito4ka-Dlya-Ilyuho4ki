@@ -1,0 +1,35 @@
+---
+import Breadcrumbs from "@/components/Breadcrumbs.astro";
+import CatalogBrowser from "@/components/CatalogBrowser.astro";
+import BaseLayout from "@/layouts/BaseLayout.astro";
+import { buildBreadcrumbs, getSeoEntry } from "@/lib/content";
+import { getSiteData } from "@/lib/google-sheets";
+
+const data = await getSiteData();
+const seoEntry = await getSeoEntry("catalog");
+
+const seo = {
+  title: seoEntry?.title ?? `Каталог | ${data.settings.storeName}`,
+  description: seoEntry?.description ?? "Каталог плитки и керамогранита.",
+  h1: seoEntry?.h1 ?? "Каталог плитки",
+  canonicalPath: seoEntry?.canonicalPath ?? "/catalog/",
+  image: seoEntry?.ogImage
+};
+---
+
+<BaseLayout seo={seo}>
+  <section class="container-shell py-10">
+    <Breadcrumbs items={buildBreadcrumbs([{ name: "Каталог", href: "/catalog/" }])} />
+    <div class="max-w-3xl">
+      <span class="section-kicker">Каталог</span>
+      <h1 class="mt-4 text-5xl">{seo.h1}</h1>
+      <p class="mt-4 text-lg leading-8 text-stoneInk/70">
+        Фильтры, поиск, сортировка и удобные карточки без перегруза интерфейса. Пользователь быстро доходит до нужной позиции и заявки.
+      </p>
+    </div>
+
+    <div class="mt-10">
+      <CatalogBrowser products={data.products} categories={data.categories} settings={data.settings} />
+    </div>
+  </section>
+</BaseLayout>

@@ -1,0 +1,40 @@
+---
+import Breadcrumbs from "@/components/Breadcrumbs.astro";
+import InquiryForm from "@/components/InquiryForm.astro";
+import TileCalculator from "@/components/TileCalculator.astro";
+import BaseLayout from "@/layouts/BaseLayout.astro";
+import { buildBreadcrumbs, getSeoEntry } from "@/lib/content";
+import { getSiteData } from "@/lib/google-sheets";
+
+const data = await getSiteData();
+const seoEntry = await getSeoEntry("calculator");
+
+const seo = {
+  title: seoEntry?.title ?? `Калькулятор плитки | ${data.settings.storeName}`,
+  description: seoEntry?.description ?? "Калькулятор плитки и стоимости.",
+  h1: seoEntry?.h1 ?? "Калькулятор плитки",
+  canonicalPath: seoEntry?.canonicalPath ?? "/calculator/",
+  image: seoEntry?.ogImage
+};
+---
+
+<BaseLayout seo={seo}>
+  <section class="container-shell py-10">
+    <Breadcrumbs items={buildBreadcrumbs([{ name: "Калькулятор плитки", href: "/calculator/" }])} />
+    <div class="max-w-3xl">
+      <span class="section-kicker">Калькулятор</span>
+      <h1 class="mt-4 text-5xl">{seo.h1}</h1>
+      <p class="mt-4 text-lg leading-8 text-stoneInk/70">
+        Этот экран можно рекламировать отдельно: пользователь сразу считает объём и стоимость, а затем отправляет заявку с уже понятным бюджетом.
+      </p>
+    </div>
+
+    <div class="mt-10">
+      <TileCalculator products={data.products} settings={data.settings} />
+    </div>
+
+    <div class="mt-16">
+      <InquiryForm settings={data.settings} title="Оставьте заявку после расчёта" />
+    </div>
+  </section>
+</BaseLayout>

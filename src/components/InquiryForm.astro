@@ -1,0 +1,86 @@
+---
+import type { Product, Settings } from "@/lib/types";
+
+interface Props {
+  settings: Settings;
+  product?: Product;
+  title?: string;
+  compact?: boolean;
+}
+
+const { settings, product, title = "Оставить заявку", compact = false } = Astro.props;
+const whatsappLink = `https://wa.me/${settings.whatsapp.replace(/[^\d]/g, "")}`;
+---
+
+<section id="lead-form" class:list={["surface-card", compact ? "p-6" : "p-8 md:p-10"]}>
+  <div class="grid gap-8 lg:grid-cols-[1fr,1.1fr]">
+    <div class="space-y-4">
+      <span class="section-kicker">Заявка</span>
+      <h2 class="text-3xl md:text-4xl">{title}</h2>
+      <p class="text-base leading-8 text-stoneInk/70">
+        Оставьте контакты, и мы поможем с подбором коллекции, количеством коробок, наличием и сроками доставки.
+      </p>
+      {product && (
+        <div class="rounded-3xl bg-fog p-5 text-sm leading-7 text-stoneInk/70">
+          <p class="font-semibold text-stoneInk">Интерес к товару</p>
+          <p>{product.name}</p>
+          <p>{product.collection}</p>
+        </div>
+      )}
+      <div class="flex flex-wrap gap-3">
+        <a href={`tel:${settings.phone.replace(/[^\d+]/g, "")}`} class="btn-secondary">Позвонить</a>
+        <a href={whatsappLink} target="_blank" rel="noreferrer" class="btn-primary">Написать в WhatsApp</a>
+      </div>
+    </div>
+
+    <form
+      name="tile-inquiry"
+      method="POST"
+      action="/success/"
+      data-netlify="true"
+      netlify-honeypot="bot-field"
+      class="grid gap-4 rounded-[1.75rem] bg-stoneInk p-6 text-white"
+    >
+      <input type="hidden" name="form-name" value="tile-inquiry" />
+      <input type="hidden" name="product_interest" value={product?.name ?? ""} />
+      <input type="hidden" name="source_page" value={Astro.url.pathname} />
+      <p class="hidden">
+        <label>
+          Не заполняйте это поле:
+          <input name="bot-field" />
+        </label>
+      </p>
+
+      <div>
+        <label class="label text-white/80" for="name">Ваше имя</label>
+        <input class="field border-white/10 bg-white/10 text-white placeholder:text-white/35" id="name" name="name" required />
+      </div>
+
+      <div>
+        <label class="label text-white/80" for="phone">Телефон</label>
+        <input
+          class="field border-white/10 bg-white/10 text-white placeholder:text-white/35"
+          id="phone"
+          name="phone"
+          type="tel"
+          placeholder="+7 (___) ___-__-__"
+          required
+        />
+      </div>
+
+      <div>
+        <label class="label text-white/80" for="message">Комментарий</label>
+        <textarea
+          class="field min-h-32 border-white/10 bg-white/10 text-white placeholder:text-white/35"
+          id="message"
+          name="message"
+          placeholder="Например: нужна плитка для ванной 18 м², интересуют светлые коллекции."
+        />
+      </div>
+
+      <button class="btn-primary w-full bg-sand-500 text-stoneInk hover:bg-sand-400" type="submit">
+        Отправить заявку
+      </button>
+    </form>
+  </div>
+</section>

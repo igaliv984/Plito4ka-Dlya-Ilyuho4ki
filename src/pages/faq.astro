@@ -1,0 +1,61 @@
+---
+import Breadcrumbs from "@/components/Breadcrumbs.astro";
+import InquiryForm from "@/components/InquiryForm.astro";
+import BaseLayout from "@/layouts/BaseLayout.astro";
+import { buildBreadcrumbs, getSeoEntry } from "@/lib/content";
+import { getSiteData } from "@/lib/google-sheets";
+
+const data = await getSiteData();
+const seoEntry = await getSeoEntry("faq");
+
+const seo = {
+  title: seoEntry?.title ?? `FAQ | ${data.settings.storeName}`,
+  description: seoEntry?.description ?? "Часто задаваемые вопросы",
+  h1: seoEntry?.h1 ?? "Часто задаваемые вопросы",
+  canonicalPath: seoEntry?.canonicalPath ?? "/faq/",
+  image: seoEntry?.ogImage
+};
+
+const breadcrumbItems = buildBreadcrumbs([{ name: "FAQ", href: "/faq/" }]);
+
+const schema = {
+  "@context": "https://schema.org",
+  "@type": "FAQPage",
+  mainEntity: data.faq.map((item) => ({
+    "@type": "Question",
+    name: item.question,
+    acceptedAnswer: {
+      "@type": "Answer",
+      text: item.answer
+    }
+  }))
+};
+---
+
+<BaseLayout seo={seo} schema={schema}>
+  <section class="container-shell py-10">
+    <Breadcrumbs items={breadcrumbItems} />
+    <div class="max-w-3xl">
+      <span class="section-kicker">FAQ</span>
+      <h1 class="mt-4 text-5xl">{seo.h1}</h1>
+      <p class="mt-4 text-lg leading-8 text-stoneInk/70">
+        Ответы на вопросы, которые чаще всего возникают перед заказом: расчёт, запас, наличие, доставка и логика оформления.
+      </p>
+    </div>
+
+    <div class="mt-10 grid gap-10 lg:grid-cols-[1fr,0.82fr]">
+      <div class="space-y-4">
+        {
+          data.faq.map((item) => (
+            <details class="surface-card p-6">
+              <summary class="cursor-pointer list-none text-lg font-semibold">{item.question}</summary>
+              <p class="mt-4 text-base leading-8 text-stoneInk/68">{item.answer}</p>
+            </details>
+          ))
+        }
+      </div>
+
+      <InquiryForm settings={data.settings} compact={true} title="Не нашли ответ? Оставьте вопрос" />
+    </div>
+  </section>
+</BaseLayout>

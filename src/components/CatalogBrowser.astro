@@ -1,0 +1,212 @@
+---
+import ProductCard from "@/components/ProductCard.astro";
+import type { Category, Product, Settings } from "@/lib/types";
+
+interface Props {
+  products: Product[];
+  categories: Category[];
+  settings: Settings;
+  initialCategory?: string;
+  lockCategory?: boolean;
+}
+
+const { products, categories, settings, initialCategory = "", lockCategory = false } = Astro.props;
+
+const optionSet = (key: keyof Product) =>
+  [...new Set(products.map((product) => String(product[key])).filter(Boolean))].sort((a, b) => a.localeCompare(b, "ru"));
+---
+
+<section data-catalog-browser>
+  <div class="surface-card p-5 md:p-6">
+    <div class="grid gap-4 xl:grid-cols-[1.3fr,repeat(5,minmax(0,1fr))]">
+      <div>
+        <label class="label" for="catalog-search">Быстрый поиск</label>
+        <input id="catalog-search" class="field" data-filter-search placeholder="Название или коллекция" />
+      </div>
+
+      {!lockCategory && (
+        <div>
+          <label class="label" for="catalog-category">Категория</label>
+          <select id="catalog-category" class="field" data-filter-category>
+            <option value="">Все категории</option>
+            {
+              categories.map((category) => (
+                <option value={category.slug} selected={initialCategory === category.slug}>
+                  {category.name}
+                </option>
+              ))
+            }
+          </select>
+        </div>
+      )}
+
+      <div>
+        <label class="label" for="catalog-collection">Коллекция</label>
+        <select id="catalog-collection" class="field" data-filter-collection>
+          <option value="">Все коллекции</option>
+          {optionSet("collection").map((value) => <option value={value}>{value}</option>)}
+        </select>
+      </div>
+
+      <div>
+        <label class="label" for="catalog-size">Формат</label>
+        <select id="catalog-size" class="field" data-filter-size>
+          <option value="">Все форматы</option>
+          {optionSet("sizeLabel").map((value) => <option value={value}>{value}</option>)}
+        </select>
+      </div>
+
+      <div>
+        <label class="label" for="catalog-color">Цвет или стиль</label>
+        <select id="catalog-color" class="field" data-filter-color>
+          <option value="">Все варианты</option>
+          {[...new Set([...optionSet("color"), ...optionSet("style")])].map((value) => <option value={value}>{value}</option>)}
+        </select>
+      </div>
+
+      <div>
+        <label class="label" for="catalog-sort">Сортировка</label>
+        <select id="catalog-sort" class="field" data-filter-sort>
+          <option value="recommended">Сначала рекомендуемые</option>
+          <option value="price-asc">Цена по возрастанию</option>
+          <option value="price-desc">Цена по убыванию</option>
+          <option value="name-asc">По названию</option>
+        </select>
+      </div>
+    </div>
+  </div>
+
+  <div class="mt-8 flex items-center justify-between gap-4">
+    <p class="text-sm text-stoneInk/55">
+      Найдено <span class="font-semibold text-stoneInk" data-results-count>{products.length}</span> товаров
+    </p>
+    <button class="text-sm font-semibold text-sand-700" type="button" data-reset-filters>Сбросить фильтры</button>
+  </div>
+
+  <div class="mt-6 grid gap-6 md:grid-cols-2 xl:grid-cols-3" data-results-grid>
+    {products.map((product) => <ProductCard product={product} settings={settings} />)}
+  </div>
+
+  <div class="mt-6 hidden rounded-[1.5rem] border border-dashed border-stoneInk/15 p-8 text-center text-stoneInk/55" data-empty-state>
+    Ничего не найдено. Попробуйте сбросить фильтры или изменить запрос.
+  </div>
+
+  <div class="mt-8 flex justify-center">
+    <button type="button" class="btn-secondary hidden" data-load-more>Показать ещё</button>
+  </div>
+</section>
+
+<script is:inline define:vars={{ initialCategory }}>
+  document.querySelectorAll("[data-catalog-browser]").forEach((browser) => {
+    const cards = Array.from(browser.querySelectorAll("[data-product-card]"));
+    const searchInput = browser.querySelector("[data-filter-search]");
+    const categoryInput = browser.querySelector("[data-filter-category]");
+    const collectionInput = browser.querySelector("[data-filter-collection]");
+    const sizeInput = browser.querySelector("[data-filter-size]");
+    const colorInput = browser.querySelector("[data-filter-color]");
+    const sortInput = browser.querySelector("[data-filter-sort]");
+    const countTarget = browser.querySelector("[data-results-count]");
+    const emptyState = browser.querySelector("[data-empty-state]");
+    const loadMoreButton = browser.querySelector("[data-load-more]");
+    const resetButton = browser.querySelector("[data-reset-filters]");
+
+    let visibleLimit = 9;
+
+    if (categoryInput && initialCategory) {
+      categoryInput.value = initialCategory;
+    }
+
+    const getText = (card, key) => String(card.dataset[key] ?? "").toLowerCase();
+
+    const applyFilters = () => {
+      const filters = {
+        search: searchInput?.value.trim().toLowerCase() ?? "",
+        category: categoryInput?.value ?? initialCategory ?? "",
+        collection: collectionInput?.value ?? "",
+        size: sizeInput?.value ?? "",
+        color: colorInput?.value ?? "",
+        sort: sortInput?.value ?? "recommended"
+      };
+
+      let filtered = cards.filter((card) => {
+        const matchesSearch =
+          !filters.search ||
+          getText(card, "name").includes(filters.search) ||
+          getText(card, "collection").includes(filters.search);
+        const matchesCategory = !filters.category || card.dataset.category === filters.category;
+        const matchesCollection = !filters.collection || card.dataset.collection === filters.collection;
+        const matchesSize = !filters.size || card.dataset.size === filters.size;
+        const matchesColor =
+          !filters.color || card.dataset.color === filters.color || card.dataset.style === filters.color;
+
+        return matchesSearch && matchesCategory && matchesCollection && matchesSize && matchesColor;
+      });
+
+      filtered = filtered.sort((cardA, cardB) => {
+        const nameA = getText(cardA, "name");
+        const nameB = getText(cardB, "name");
+        const priceA = Number(cardA.dataset.price ?? 0);
+        const priceB = Number(cardB.dataset.price ?? 0);
+
+        switch (filters.sort) {
+          case "price-asc":
+            return priceA - priceB;
+          case "price-desc":
+            return priceB - priceA;
+          case "name-asc":
+            return nameA.localeCompare(nameB, "ru");
+          default:
+            return 0;
+        }
+      });
+
+      cards.forEach((card) => {
+        card.classList.add("hidden");
+      });
+
+      filtered.slice(0, visibleLimit).forEach((card) => {
+        card.classList.remove("hidden");
+      });
+
+      countTarget.textContent = String(filtered.length);
+      emptyState.classList.toggle("hidden", filtered.length > 0);
+      loadMoreButton.classList.toggle("hidden", filtered.length <= visibleLimit);
+      loadMoreButton.dataset.total = String(filtered.length);
+    };
+
+    const resetFilters = () => {
+      visibleLimit = 9;
+      if (searchInput) searchInput.value = "";
+      if (categoryInput) categoryInput.value = initialCategory ?? "";
+      if (collectionInput) collectionInput.value = "";
+      if (sizeInput) sizeInput.value = "";
+      if (colorInput) colorInput.value = "";
+      if (sortInput) sortInput.value = "recommended";
+      applyFilters();
+    };
+
+    if (searchInput) {
+      searchInput.addEventListener("input", () => {
+        visibleLimit = 9;
+        applyFilters();
+      });
+    }
+
+    [categoryInput, collectionInput, sizeInput, colorInput, sortInput]
+      .filter(Boolean)
+      .forEach((input) =>
+        input.addEventListener("change", () => {
+          visibleLimit = 9;
+          applyFilters();
+        })
+      );
+
+    loadMoreButton.addEventListener("click", () => {
+      visibleLimit += 9;
+      applyFilters();
+    });
+
+    resetButton.addEventListener("click", resetFilters);
+    applyFilters();
+  });
+</script>

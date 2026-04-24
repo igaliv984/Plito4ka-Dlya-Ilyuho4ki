@@ -1,0 +1,87 @@
+@import url("https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=Playfair+Display:wght@600;700&display=swap");
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    color-scheme: light;
+  }
+
+  html {
+    scroll-behavior: smooth;
+  }
+
+  body {
+    @apply bg-fog font-sans text-stoneInk antialiased;
+    background-image:
+      radial-gradient(circle at top, rgba(201, 166, 112, 0.13), transparent 24%),
+      linear-gradient(180deg, rgba(255, 255, 255, 0.5), rgba(246, 244, 239, 0.9));
+  }
+
+  h1,
+  h2,
+  h3,
+  h4 {
+    @apply font-display tracking-tight text-stoneInk;
+  }
+
+  a {
+    @apply transition-colors duration-200;
+  }
+}
+
+@layer components {
+  .container-shell {
+    @apply mx-auto w-full max-w-7xl px-4 sm:px-6 lg:px-8;
+  }
+
+  .surface-card {
+    @apply rounded-[2rem] border border-white/70 bg-white/80 shadow-soft backdrop-blur;
+  }
+
+  .section-kicker {
+    @apply inline-flex items-center gap-2 rounded-full border border-sand-200 bg-white/70 px-4 py-1 text-xs font-semibold uppercase tracking-[0.24em] text-sand-700;
+  }
+
+  .btn-primary {
+    @apply inline-flex items-center justify-center rounded-full bg-stoneInk px-6 py-3 text-sm font-semibold text-white transition hover:bg-sand-700;
+  }
+
+  .btn-secondary {
+    @apply inline-flex items-center justify-center rounded-full border border-stoneInk/15 bg-white px-6 py-3 text-sm font-semibold text-stoneInk transition hover:border-sand-400 hover:text-sand-700;
+  }
+
+  .label {
+    @apply mb-2 block text-sm font-medium text-stoneInk/80;
+  }
+
+  .field {
+    @apply w-full rounded-2xl border border-stoneInk/10 bg-white px-4 py-3 text-sm text-stoneInk shadow-sm outline-none ring-0 transition placeholder:text-stoneInk/35 focus:border-sand-400;
+  }
+
+  .prose-lite {
+    @apply text-base leading-8 text-stoneInk/75;
+  }
+
+  .prose-lite h2 {
+    @apply mt-10 text-3xl;
+  }
+
+  .prose-lite h3 {
+    @apply mt-8 text-2xl;
+  }
+
+  .prose-lite p {
+    @apply mt-4;
+  }
+
+  .prose-lite ul {
+    @apply mt-4 space-y-3 pl-5;
+  }
+
+  .prose-lite li {
+    @apply list-disc;
+  }
+}

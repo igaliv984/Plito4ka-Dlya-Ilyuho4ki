@@ -1,0 +1,74 @@
+---
+import Breadcrumbs from "@/components/Breadcrumbs.astro";
+import CatalogBrowser from "@/components/CatalogBrowser.astro";
+import BaseLayout from "@/layouts/BaseLayout.astro";
+import { buildBreadcrumbs, getCategoryBySlug, getCategoryProducts } from "@/lib/content";
+import { getSiteData } from "@/lib/google-sheets";
+
+export async function getStaticPaths() {
+  const data = await getSiteData();
+
+  return data.categories.map((category) => ({
+    params: { category: category.slug }
+  }));
+}
+
+const { category: categorySlug } = Astro.params;
+const data = await getSiteData();
+const category = await getCategoryBySlug(categorySlug ?? "");
+const products = await getCategoryProducts(categorySlug ?? "");
+
+if (!category) {
+  return Astro.redirect("/404/");
+}
+
+const seo = {
+  title: category.seoTitle,
+  description: category.seoDescription,
+  h1: category.heroTitle,
+  canonicalPath: `/catalog/${category.slug}/`,
+  image: category.image
+};
+
+const breadcrumbItems = buildBreadcrumbs([
+  { name: "Каталог", href: "/catalog/" },
+  { name: category.name, href: `/catalog/${category.slug}/` }
+]);
+
+const schema = {
+  "@context": "https://schema.org",
+  "@type": "BreadcrumbList",
+  itemListElement: breadcrumbItems.map((item, index) => ({
+    "@type": "ListItem",
+    position: index + 1,
+    name: item.name,
+    item: new URL(item.href, Astro.site ?? "https://example-tile-store.netlify.app").toString()
+  }))
+};
+---
+
+<BaseLayout seo={seo} schema={schema}>
+  <section class="container-shell py-10">
+    <Breadcrumbs items={breadcrumbItems} />
+    <div class="grid gap-8 lg:grid-cols-[1fr,0.9fr]">
+      <div>
+        <span class="section-kicker">Категория</span>
+        <h1 class="mt-4 text-5xl">{category.heroTitle}</h1>
+        <p class="mt-4 max-w-3xl text-lg leading-8 text-stoneInk/70">{category.heroText}</p>
+      </div>
+      <div class="surface-card overflow-hidden">
+        <img src={category.image} alt={category.name} class="h-full min-h-[280px] w-full object-cover" />
+      </div>
+    </div>
+
+    <div class="mt-10">
+      <CatalogBrowser
+        products={products}
+        categories={data.categories}
+        settings={data.settings}
+        initialCategory={category.slug}
+        lockCategory={true}
+      />
+    </div>
+  </section>
+</BaseLayout>

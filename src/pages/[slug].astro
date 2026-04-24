@@ -1,0 +1,135 @@
+---
+import Breadcrumbs from "@/components/Breadcrumbs.astro";
+import InquiryForm from "@/components/InquiryForm.astro";
+import BaseLayout from "@/layouts/BaseLayout.astro";
+import { buildBreadcrumbs, getPageBySlug } from "@/lib/content";
+import { getSiteData } from "@/lib/google-sheets";
+import { simpleRichTextToHtml } from "@/lib/rich-text";
+
+export async function getStaticPaths() {
+  const data = await getSiteData();
+
+  return data.pages.map((page) => ({
+    params: { slug: page.slug }
+  }));
+}
+
+const { slug } = Astro.params;
+const data = await getSiteData();
+const page = await getPageBySlug(slug ?? "");
+
+if (!page) {
+  return Astro.redirect("/404/");
+}
+
+const seo = {
+  title: page.seoTitle,
+  description: page.seoDescription,
+  h1: page.title,
+  canonicalPath: `/${page.slug}/`
+};
+
+const breadcrumbItems = buildBreadcrumbs([{ name: page.title, href: `/${page.slug}/` }]);
+const showContactsCard = page.slug === "about" || page.slug === "contacts" || page.slug === "delivery-payment";
+const showMap = (page.slug === "about" || page.slug === "contacts") && Boolean(data.settings.mapEmbedUrl);
+const showDeliveryCard = page.slug === "about" || page.slug === "delivery-payment";
+---
+
+<BaseLayout seo={seo}>
+  <section class="container-shell py-10">
+    <Breadcrumbs items={breadcrumbItems} />
+    {page.slug === "about" && (
+      <div class="surface-card mb-10 overflow-hidden">
+        <div class="grid gap-0 lg:grid-cols-[1fr,0.9fr]">
+          <div class="p-8 md:p-10">
+            <span class="section-kicker">Контакты</span>
+            <h2 class="mt-4 text-4xl">Связаться с нами</h2>
+            <div class="mt-6 grid gap-4 md:grid-cols-2">
+              <div class="rounded-3xl bg-fog p-5">
+                <p class="text-sm text-stoneInk/45">Телефон</p>
+                <a href={`tel:${data.settings.phone.replace(/[^\d+]/g, "")}`} class="mt-2 block text-lg font-semibold">
+                  {data.settings.phone}
+                </a>
+              </div>
+              <div class="rounded-3xl bg-fog p-5">
+                <p class="text-sm text-stoneInk/45">E-mail</p>
+                <a href={`mailto:${data.settings.email}`} class="mt-2 block text-lg font-semibold">
+                  {data.settings.email}
+                </a>
+              </div>
+              <div class="rounded-3xl bg-fog p-5 md:col-span-2">
+                <p class="text-sm text-stoneInk/45">Адрес</p>
+                <p class="mt-2 text-lg font-semibold">{data.settings.address}</p>
+                <p class="mt-2 text-stoneInk/65">{data.settings.workingHours}</p>
+              </div>
+            </div>
+          </div>
+          <div class="border-t border-stoneInk/8 bg-fog p-4 lg:border-l lg:border-t-0">
+            <iframe
+              src={data.settings.mapEmbedUrl}
+              title={`Карта: ${data.settings.address}`}
+              class="h-full min-h-[320px] w-full rounded-[1.5rem] border-0"
+              loading="lazy"
+            />
+          </div>
+        </div>
+      </div>
+    )}
+    <div class="grid gap-10 lg:grid-cols-[1fr,0.8fr]">
+      <article class="surface-card p-8 md:p-10">
+        <span class="section-kicker">Информация</span>
+        <h1 class="mt-4 text-5xl">{page.title}</h1>
+        <div class="prose-lite mt-8" set:html={simpleRichTextToHtml(page.content)} />
+      </article>
+
+      <div class="space-y-6">
+        {showContactsCard && page.slug !== "about" && (
+          <div class="surface-card overflow-hidden">
+            <div class="p-8">
+              <span class="section-kicker">Контакты</span>
+              <h2 class="mt-4 text-4xl">Связаться с нами</h2>
+              <div class="mt-6 space-y-4 text-base leading-8 text-stoneInk/70">
+                <p>
+                  <strong>Телефон:</strong> <a href={`tel:${data.settings.phone.replace(/[^\d+]/g, "")}`}>{data.settings.phone}</a>
+                </p>
+                <p>
+                  <strong>E-mail:</strong> <a href={`mailto:${data.settings.email}`}>{data.settings.email}</a>
+                </p>
+                <p>
+                  <strong>Адрес:</strong> {data.settings.address}
+                </p>
+                <p>
+                  <strong>Время работы:</strong> {data.settings.workingHours}
+                </p>
+                <a href={data.settings.mapLink} class="btn-secondary" target="_blank" rel="noreferrer">Открыть карту</a>
+              </div>
+            </div>
+
+            {showMap && (
+              <div class="border-t border-stoneInk/8 bg-fog p-4">
+                <iframe
+                  src={data.settings.mapEmbedUrl}
+                  title={`Карта: ${data.settings.address}`}
+                  class="h-80 w-full rounded-[1.5rem] border-0"
+                  loading="lazy"
+                />
+              </div>
+            )}
+          </div>
+        )}
+
+        {showDeliveryCard && page.slug === "about" && (
+          <div class="surface-card p-8">
+            <span class="section-kicker">Доставка</span>
+            <h2 class="mt-4 text-3xl">Доставка и оплата</h2>
+            <p class="mt-4 text-base leading-8 text-stoneInk/70">
+              После заявки менеджер уточняет остатки, логистику и финальную стоимость. Самовывоз, доставка по городу и отправка в регионы доступны по договоренности.
+            </p>
+          </div>
+        )}
+
+        <InquiryForm settings={data.settings} compact={true} title="Задать вопрос или запросить подбор" />
+      </div>
+    </div>
+  </section>
+</BaseLayout>
