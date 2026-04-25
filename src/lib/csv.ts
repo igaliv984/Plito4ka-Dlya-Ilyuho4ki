@@ -70,22 +70,22 @@ export function parseCsv(input: string): Record<string, string>[] {
     );
 }
 
-export function parseNumber(value: string, fallback = 0): number {
-  if (!value) {
+export function parseNumber(value: string | number | undefined | null, fallback = 0): number {
+  if (value === undefined || value === null || value === "") {
     return fallback;
   }
 
-  const normalized = Number(value.toString().replace(",", ".").replace(/\s/g, ""));
+  const normalized = Number(String(value).replace(",", ".").replace(/\s/g, ""));
   return Number.isFinite(normalized) ? normalized : fallback;
 }
 
 export function parseBoolean(value: string): boolean {
-  return ["true", "1", "yes", "y", "да"].includes(value.toLowerCase().trim());
+  return ["true", "1", "yes", "y", "да", "в наличии", "есть", "available"].includes(value.toLowerCase().trim());
 }
 
 export function splitMultiValue(value: string): string[] {
   return value
-    .split(/\r?\n|,/)
+    .split(/\r?\n|,|;/)
     .map((item) => item.trim())
     .filter(Boolean);
 }

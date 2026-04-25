@@ -1,21 +1,35 @@
 # Catalog XLSX
 
-If you want the simplest workflow, put your spreadsheet here as:
+Основной сценарий теперь простой:
 
-`data/catalog.xlsx`
+1. Положите актуальную таблицу в `data/catalog.xlsx`.
+2. Перезапустите локальный сервер или заново соберите проект.
+3. Сайт сам подтянет товары, цены и ссылки на изображения из файла.
 
-Then set:
+Поддерживаемые поля из ассортиментной таблицы:
 
-```env
-GOOGLE_SHEETS_PRODUCTS_FORMAT=stock_report
-```
+- `Код номенклатуры`
+- `Артикул`
+- `Наименование`
+- `Изображение`
+- `Изображения` (необязательно)
+- `Производитель`
+- `Страна`
+- `Текстура`
+- `Тип поверхности`
+- `Цвет`
+- `Размер`
+- `Толщина`
+- `Назначение`
+- `Розничная цена`
+- `Штук в упаковке`
+- `м2 в упаковке`
+- `Наличие` (необязательно)
 
-What the file should contain:
+Что важно:
 
-- your existing product list;
-- one column named `Наличие`;
-- one last column with a photo URL, or a column named `Фото`.
+- сайт использует только розничную цену;
+- ссылки на изображения должны быть прямыми `https://...`;
+- лишние столбцы можно оставлять, они будут проигнорированы.
 
-The site will read the spreadsheet at build time and generate the catalog automatically.
-
-If you prefer Google Sheets instead, you can still use the existing mini-CMS mode.
+Google Sheets тоже можно использовать, но локальный `catalog.xlsx` всегда в приоритете.

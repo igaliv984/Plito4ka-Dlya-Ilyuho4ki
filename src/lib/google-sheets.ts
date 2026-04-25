@@ -5,71 +5,35 @@ import pagesJson from "@/data/sample/pages.json";
 import productsJson from "@/data/sample/products.json";
 import seoJson from "@/data/sample/seo.json";
 import settingsJson from "@/data/sample/settings.json";
-import {
-  parseBoolean,
-  parseCsv,
-  parseCsvRows,
-  parseNumber,
-  slugify,
-  sortByOrder,
-  splitMultiValue,
-  splitPipePairs
-} from "@/lib/csv";
+import { parseBoolean, parseCsv, parseCsvRows, parseNumber, slugify, sortByOrder, splitMultiValue, splitPipePairs } from "@/lib/csv";
 import type { Category, Creative, FAQEntry, PageEntry, Product, SeoEntry, Settings, SiteData } from "@/lib/types";
+import { readXlsxRows } from "@/lib/xlsx-reader";
 import { existsSync } from "node:fs";
 import { resolve } from "node:path";
-import { readXlsxRows } from "@/lib/xlsx-reader";
 
 type RawRecord = Record<string, string>;
+type OptionalSheetKey = "PAGES" | "FAQ" | "SEO" | "SETTINGS";
 
-const SHEET_KEYS = ["PRODUCTS", "CATEGORIES", "CREATIVES", "PAGES", "FAQ", "SEO", "SETTINGS"] as const;
+const OPTIONAL_SHEET_KEYS: OptionalSheetKey[] = ["PAGES", "FAQ", "SEO", "SETTINGS"];
 const env = import.meta.env as Record<string, string | undefined>;
+const fallbackImage = "https://images.unsplash.com/photo-1513694203232-719a280e022f?auto=format&fit=crop&w=1200&q=80";
+
 let siteDataCache: Promise<SiteData> | null = null;
-
-function getSheetEnvKey(sheetName: (typeof SHEET_KEYS)[number]): string {
-  return `GOOGLE_SHEETS_${sheetName}_GID`;
-}
-
-function getExplicitProductsFormat(): string | null {
-  const format = env.GOOGLE_SHEETS_PRODUCTS_FORMAT?.toLowerCase().trim();
-  return format || null;
-}
-
-function hasLocalStockReportFile(): boolean {
-  return existsSync(getLocalXlsxPath());
-}
-
-function getProductsFormat(): string {
-  const explicitFormat = getExplicitProductsFormat();
-  if (explicitFormat === "stock_report") {
-    return explicitFormat;
-  }
-
-  if (hasLocalStockReportFile()) {
-    return "stock_report";
-  }
-
-  if (explicitFormat) {
-    return explicitFormat;
-  }
-
-  return "catalog";
-}
 
 function getLocalXlsxPath(): string {
   return resolve(process.cwd(), env.LOCAL_XLSX_PATH ?? "data/catalog.xlsx");
 }
 
-function isRemoteConfigured() {
-  if (getProductsFormat() === "stock_report" && hasLocalStockReportFile()) {
-    return true;
-  }
+function hasLocalCatalogFile(): boolean {
+  return existsSync(getLocalXlsxPath());
+}
 
-  if (getProductsFormat() === "stock_report") {
-    return Boolean(env.GOOGLE_SHEETS_PRODUCTS_GID);
-  }
+function getSheetEnvKey(sheetName: OptionalSheetKey): string {
+  return `GOOGLE_SHEETS_${sheetName}_GID`;
+}
 
-  return Boolean(env.GOOGLE_SHEETS_ID && SHEET_KEYS.every((key) => Boolean(env[getSheetEnvKey(key)])));
+function isGoogleSheetsConfigured(): boolean {
+  return Boolean(env.GOOGLE_SHEETS_ID && env.GOOGLE_SHEETS_PRODUCTS_GID);
 }
 
 async function fetchSheetCsv(gid: string): Promise<string> {
@@ -88,69 +52,199 @@ async function fetchSheetRows(gid: string): Promise<RawRecord[]> {
   return parseCsv(await fetchSheetCsv(gid));
 }
 
-function extractSizeLabel(name: string): string {
-  const match = name.match(/(\d{1,3})\s*[xх]\s*(\d{1,4})/i);
-  return match ? `${match[1]}x${match[2]} см` : "";
-}
-
-function extractTileDimensions(name: string): { lengthMm: number; widthMm: number } {
-  const match = name.match(/(\d{1,3})\s*[xх]\s*(\d{1,4})/i);
-  if (!match) {
-    return { lengthMm: 600, widthMm: 600 };
+function rowsToRecords(rows: string[][]): RawRecord[] {
+  if (rows.length === 0) {
+    return [];
   }
 
-  const first = parseNumber(match[1]) * 10;
-  const second = parseNumber(match[2]) * 10;
-  return {
-    lengthMm: Math.max(first, second),
-    widthMm: Math.min(first, second)
-  };
+  const [headers, ...dataRows] = rows;
+  return dataRows
+    .filter((row) => row.some((cell) => String(cell ?? "").trim().length > 0))
+    .map((row) =>
+      headers.reduce<RawRecord>((record, header, index) => {
+        record[String(header ?? "").trim()] = String(row[index] ?? "").trim();
+        return record;
+      }, {})
+    );
 }
 
-function buildWarehouseHeaders(rows: string[][]): Array<{ index: number; name: string }> {
-  const row1 = rows[0] ?? [];
-  const row3 = rows[2] ?? [];
-  const headers: Array<{ index: number; name: string }> = [];
+function normalizeHeader(value: string): string {
+  return value
+    .toLowerCase()
+    .replace(/ё/g, "е")
+    .replace(/[().,/\\_-]+/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
 
-  for (let index = 0; index < row1.length; index += 1) {
-    const warehouse = row1[index]?.trim();
-    const metric = row3[index]?.trim();
+function getRecordValue(record: RawRecord, aliases: string[]): string {
+  const normalizedRecord = Object.entries(record).reduce<Record<string, string>>((bucket, [key, value]) => {
+    bucket[normalizeHeader(key)] = value;
+    return bucket;
+  }, {});
 
-    if (warehouse && warehouse.toLowerCase().includes("склад") && (!metric || metric.toLowerCase() === "наличие")) {
-      headers.push({ index, name: warehouse });
+  for (const alias of aliases) {
+    const value = normalizedRecord[normalizeHeader(alias)];
+    if (value !== undefined) {
+      return value;
     }
   }
 
-  return headers;
+  return "";
 }
 
-function isOnlyFirstCellFilled(row: string[]): boolean {
-  return Boolean(row[0]?.trim()) && row.slice(1).every((cell) => !cell?.trim());
+function parseImages(value: string): string[] {
+  return value
+    .split(/\r?\n|,|;|\|/)
+    .map((item) => item.trim())
+    .filter((item) => /^https?:\/\//i.test(item));
 }
 
-function buildStockReportProducts(rows: string[][]): Product[] {
-  const warehouseHeaders = buildWarehouseHeaders(rows);
+function parseSize(sizeLabel: string): { lengthMm: number; widthMm: number; normalizedLabel: string } {
+  const match = sizeLabel.match(/(\d{1,4})\s*[xх×]\s*(\d{1,4})/i);
+  if (!match) {
+    return {
+      lengthMm: 600,
+      widthMm: 600,
+      normalizedLabel: sizeLabel.trim()
+    };
+  }
+
+  const first = parseNumber(match[1], 60);
+  const second = parseNumber(match[2], 60);
+  const unitFactor = Math.max(first, second) <= 200 ? 10 : 1;
+  const lengthMm = Math.max(first, second) * unitFactor;
+  const widthMm = Math.min(first, second) * unitFactor;
+
+  return {
+    lengthMm,
+    widthMm,
+    normalizedLabel: `${match[1]}x${match[2]}`
+  };
+}
+
+function parseAvailability(value: string): boolean {
+  const normalized = value.toLowerCase().trim();
+
+  if (!normalized) {
+    return true;
+  }
+
+  if (parseBoolean(normalized)) {
+    return true;
+  }
+
+  if (["нет", "0", "под заказ", "out of stock", "unavailable"].includes(normalized)) {
+    return false;
+  }
+
+  const numeric = parseNumber(normalized, Number.NaN);
+  return Number.isNaN(numeric) ? true : numeric > 0;
+}
+
+function getAssortmentProducts(records: RawRecord[]): Product[] {
+  return records
+    .map((record, index) => {
+      const id = getRecordValue(record, ["Код номенклатуры", "id"]) || getRecordValue(record, ["Артикул", "sku"]);
+      const article = getRecordValue(record, ["Артикул", "sku"]);
+      const name = getRecordValue(record, ["Наименование", "name"]);
+
+      if (!name) {
+        return null;
+      }
+
+      const mainImage =
+        getRecordValue(record, ["Изображение", "Фото", "main_image"]) ||
+        parseImages(getRecordValue(record, ["Изображения", "gallery_images"]))[0] ||
+        fallbackImage;
+      const galleryImages = parseImages(getRecordValue(record, ["Изображения", "gallery_images"])).filter(
+        (image) => image !== mainImage
+      );
+      const brand = getRecordValue(record, ["Производитель", "Бренд", "brand"]);
+      const country = getRecordValue(record, ["Страна", "country"]);
+      const texture = getRecordValue(record, ["Текстура", "Коллекция", "collection"]);
+      const surface = getRecordValue(record, ["Тип поверхности", "Поверхность", "surface"]);
+      const color = getRecordValue(record, ["Цвет", "color"]);
+      const size = getRecordValue(record, ["Размер", "Формат", "size_label"]);
+      const purpose = getRecordValue(record, ["Назначение", "style"]);
+      const retailPrice = parseNumber(getRecordValue(record, ["Розничная цена", "Цена", "price_m2"]));
+      const piecesPerBox = parseNumber(getRecordValue(record, ["Штук в упаковке", "pieces_per_box"]), 1);
+      const boxAreaM2 = parseNumber(getRecordValue(record, ["м2 в упаковке", "м² в упаковке", "box_area_m2"]), 0);
+      const availabilityValue = getRecordValue(record, ["Наличие", "in_stock"]);
+      const inStock = parseAvailability(availabilityValue);
+      const { lengthMm, widthMm, normalizedLabel } = parseSize(size);
+      const categoryName = country || brand || "Каталог";
+      const categorySlug = slugify(categoryName || "catalog");
+      const slugBase = [name, article, id].filter(Boolean).join(" ");
+
+      return {
+        id: id || slugify(slugBase) || `product-${index + 1}`,
+        slug: slugify(slugBase) || `product-${index + 1}`,
+        name,
+        category: categorySlug || "catalog",
+        country,
+        brand,
+        collection: texture || brand || country || "Коллекция",
+        shortDescription: [brand, country, surface, normalizedLabel].filter(Boolean).join(" · "),
+        description: [
+          brand ? `Производитель: ${brand}.` : "",
+          country ? `Страна: ${country}.` : "",
+          texture ? `Текстура: ${texture}.` : "",
+          surface ? `Поверхность: ${surface}.` : "",
+          color ? `Цвет: ${color}.` : "",
+          purpose ? `Назначение: ${purpose}.` : "",
+          size ? `Формат: ${normalizedLabel}.` : ""
+        ]
+          .filter(Boolean)
+          .join(" "),
+        priceM2: retailPrice,
+        oldPriceM2: 0,
+        tileLengthMm: lengthMm,
+        tileWidthMm: widthMm,
+        piecesPerBox,
+        boxAreaM2,
+        color,
+        style: purpose,
+        surface,
+        sizeLabel: normalizedLabel || size,
+        featured: index < 8,
+        sortOrder: index + 1,
+        mainImage,
+        galleryImages,
+        altText: name,
+        seoTitle: `${name} | ${brand || "Каталог плитки"}`,
+        seoDescription: [name, brand, country, normalizedLabel].filter(Boolean).join(", "),
+        inStock,
+        callToActionText: inStock ? "Оставить заявку" : "Уточнить наличие",
+        sku: article || id,
+        unit: "м²"
+      } satisfies Product;
+    })
+    .filter((product): product is Product => Boolean(product));
+}
+
+function getLegacyStockProducts(rows: string[][]): Product[] {
   const products: Product[] = [];
   let currentCountry = "";
   let currentBrand = "";
   let currentCollection = "";
 
-  for (let rowIndex = 5; rowIndex < rows.length; rowIndex += 1) {
-    const row = rows[rowIndex].map((cell) => cell?.trim?.() ?? "");
+  for (let rowIndex = 0; rowIndex < rows.length; rowIndex += 1) {
+    const row = rows[rowIndex].map((cell) => String(cell ?? "").trim());
 
     if (row.every((cell) => !cell)) {
       continue;
     }
 
-    if (isOnlyFirstCellFilled(row)) {
+    if (row.length === 1 || row.slice(1).every((cell) => !cell)) {
       const value = row[0];
-      if (!value || value === "Складской") {
+      if (!value || value.includes("Номенклатура") || value === "Складской") {
         continue;
       }
 
-      if (/^[А-ЯA-Z\s]+$/.test(value) && !value.includes("(") && value.length < 40) {
+      if (!currentCountry) {
         currentCountry = value;
-      } else if (value.includes("(")) {
+      } else if (!currentBrand) {
         currentBrand = value;
       } else {
         currentCollection = value;
@@ -160,50 +254,31 @@ function buildStockReportProducts(rows: string[][]): Product[] {
 
     const name = row[0];
     const id = row[1] || slugify(name);
-    const article = row[2] || "";
-    const unit = row[3] || "м2";
-    const warehouseStock = warehouseHeaders.reduce<Record<string, number>>((bucket, item) => {
-      bucket[item.name] = parseNumber(row[item.index], 0);
-      return bucket;
-    }, {});
-    const stockTotal = Object.values(warehouseStock).reduce((sum, value) => sum + value, 0);
-    const photoCandidate = row[row.length - 2] ?? "";
-    const availabilityCandidate = row[row.length - 1] ?? "";
-    const looksLikeUrl = /^https?:\/\//i.test(photoCandidate) || /\.(png|jpe?g|webp|avif|gif|svg)(\?|#|$)/i.test(photoCandidate);
-    const availabilityText = availabilityCandidate.trim().toLowerCase();
-    const availabilityAsStock =
-      availabilityText && !Number.isNaN(Number(availabilityCandidate))
-        ? Number(availabilityCandidate) > 0
-        : undefined;
-    const availabilityAsBool =
-      availabilityText === "наличие" ||
-      ["да", "есть", "true", "yes", "1", "в наличии", "available"].includes(availabilityText)
-        ? true
-        : ["нет", "0", "false", "no", "out", "out of stock", "закончился", "под заказ"].includes(availabilityText)
-          ? false
-          : availabilityAsStock;
-    const { lengthMm, widthMm } = extractTileDimensions(name);
-    const sizeLabel = extractSizeLabel(name);
-    const countrySlug = slugify(currentCountry || "Каталог");
-    const productSlug = slugify(`${currentBrand} ${currentCollection} ${name} ${id}`);
+
+    if (!name || name.includes("Номенклатура")) {
+      continue;
+    }
+
+    const sizeMatch = name.match(/(\d{1,4})\s*[xх×]\s*(\d{1,4})/i);
+    const sizeLabel = sizeMatch ? `${sizeMatch[1]}x${sizeMatch[2]}` : "";
+    const { lengthMm, widthMm } = parseSize(sizeLabel || "60x60");
+    const stockCells = row.slice(5).filter(Boolean);
+    const stockTotal = stockCells.reduce((sum, value) => sum + parseNumber(value, 0), 0);
+    const categoryName = currentCountry || currentBrand || "Каталог";
 
     products.push({
       id,
-      slug: productSlug,
+      slug: slugify([currentBrand, currentCollection, name, id].filter(Boolean).join(" ")) || `product-${products.length + 1}`,
       name,
-      category: countrySlug,
+      category: slugify(categoryName) || "catalog",
       country: currentCountry,
       brand: currentBrand,
-      collection: currentCollection || currentBrand || currentCountry,
-      shortDescription: `${currentBrand || "Плитка"} ${currentCollection ? `из коллекции ${currentCollection}` : ""}`.trim(),
-      description: [
-        currentCountry ? `Страна: ${currentCountry}.` : "",
-        currentBrand ? `Бренд: ${currentBrand}.` : "",
-        currentCollection ? `Коллекция: ${currentCollection}.` : "",
-        stockTotal > 0 ? `Суммарный остаток по складам: ${stockTotal} ${unit}.` : "Наличие уточняйте у менеджера."
-      ]
-        .filter(Boolean)
-        .join(" "),
+      collection: currentCollection || currentBrand || currentCountry || "Коллекция",
+      shortDescription: [currentBrand, currentCollection, currentCountry].filter(Boolean).join(" · "),
+      description:
+        stockTotal > 0
+          ? `Товар из складского отчета. Суммарный остаток: ${stockTotal} м².`
+          : "Товар из складского отчета. Наличие уточняйте у менеджера.",
       priceM2: 0,
       oldPriceM2: 0,
       tileLengthMm: lengthMm,
@@ -216,21 +291,33 @@ function buildStockReportProducts(rows: string[][]): Product[] {
       sizeLabel,
       featured: products.length < 8,
       sortOrder: products.length + 1,
-      mainImage: looksLikeUrl ? photoCandidate : "https://images.unsplash.com/photo-1505693416388-ac5ce068fe85?auto=format&fit=crop&w=1200&q=80",
+      mainImage: fallbackImage,
       galleryImages: [],
       altText: name,
       seoTitle: `${name} | ${currentBrand || "Каталог плитки"}`,
-      seoDescription: `${name}${currentCollection ? `, коллекция ${currentCollection}` : ""}${currentCountry ? `, ${currentCountry}` : ""}.`,
-      inStock: availabilityAsBool ?? stockTotal > 0,
-      callToActionText: (availabilityAsBool ?? stockTotal > 0) ? "Оставить заявку" : "Уточнить наличие",
-      sku: article || id,
-      unit,
-      stockTotal,
-      warehouseStock
+      seoDescription: [name, currentCollection, currentCountry].filter(Boolean).join(", "),
+      inStock: stockTotal > 0,
+      callToActionText: stockTotal > 0 ? "Оставить заявку" : "Уточнить наличие",
+      sku: row[2] || id,
+      unit: "м²",
+      stockTotal
     });
   }
 
   return products;
+}
+
+function isAssortmentFormat(rows: string[][]): boolean {
+  const headers = (rows[0] ?? []).map((header) => normalizeHeader(header));
+  return headers.includes(normalizeHeader("Код номенклатуры")) && headers.includes(normalizeHeader("Наименование"));
+}
+
+function buildProductsFromRows(rows: string[][]): Product[] {
+  if (isAssortmentFormat(rows)) {
+    return getAssortmentProducts(rowsToRecords(rows));
+  }
+
+  return getLegacyStockProducts(rows);
 }
 
 function buildCategoriesFromProducts(products: Product[]): Category[] {
@@ -241,19 +328,19 @@ function buildCategoriesFromProducts(products: Product[]): Category[] {
       return;
     }
 
-    const name = product.country || product.category;
+    const name = product.country || product.brand || product.collection || "Каталог";
     categoryMap.set(product.category, {
       id: product.category,
       slug: product.category,
       name,
-      description: `Плитка и керамогранит по направлению ${name}.`,
+      description: `Подборка плитки и керамогранита по направлению ${name}.`,
       heroTitle: `${name}: каталог плитки и керамогранита`,
-      heroText: `Серии, коллекции и остатки по складам для направления ${name}.`,
+      heroText: `Собрали товары по направлению ${name} с быстрым переходом к карточке и заявке.`,
       image: product.mainImage,
       featured: categoryMap.size < 4,
       sortOrder: categoryMap.size + 1,
       seoTitle: `${name} | Каталог плитки`,
-      seoDescription: `Каталог плитки по направлению ${name}: коллекции, остатки и быстрый переход к заявке.`
+      seoDescription: `Каталог плитки по направлению ${name}: актуальные позиции, фото и быстрый запрос на расчет.`
     });
   });
 
@@ -291,7 +378,7 @@ function normalizeProducts(rows: Array<RawRecord | Product>, creatives: Creative
       const directGallery = sortByOrder(creativesByProduct[row.id] ?? []).map((item) => item.url);
       return {
         ...row,
-        galleryImages: [...row.galleryImages, ...directGallery.filter((url) => !row.galleryImages.includes(url))]
+        galleryImages: [...new Set([...row.galleryImages, ...directGallery])]
       };
     }
 
@@ -310,8 +397,8 @@ function normalizeProducts(rows: Array<RawRecord | Product>, creatives: Creative
       description: row.description ?? "",
       priceM2: parseNumber(row.price_m2),
       oldPriceM2: parseNumber(row.old_price_m2),
-      tileLengthMm: parseNumber(row.tile_length_mm),
-      tileWidthMm: parseNumber(row.tile_width_mm),
+      tileLengthMm: parseNumber(row.tile_length_mm, 600),
+      tileWidthMm: parseNumber(row.tile_width_mm, 600),
       piecesPerBox: parseNumber(row.pieces_per_box, 1),
       boxAreaM2: parseNumber(row.box_area_m2),
       color: row.color ?? "",
@@ -320,44 +407,44 @@ function normalizeProducts(rows: Array<RawRecord | Product>, creatives: Creative
       sizeLabel: row.size_label ?? "",
       featured: parseBoolean(row.featured ?? ""),
       sortOrder: parseNumber(row.sort_order, 0),
-      mainImage: row.main_image ?? "",
-      galleryImages: [...csvGallery, ...creativeGallery.filter((url) => !csvGallery.includes(url))],
+      mainImage: row.main_image ?? fallbackImage,
+      galleryImages: [...new Set([...csvGallery, ...creativeGallery])],
       altText: row.alt_text ?? row.name ?? "",
       seoTitle: row.seo_title ?? row.name ?? "",
       seoDescription: row.seo_description ?? row.short_description ?? "",
       inStock: parseBoolean(row.in_stock ?? ""),
       callToActionText: row.call_to_action_text ?? "Оставить заявку",
       sku: row.sku ?? row.article ?? "",
-      unit: row.unit ?? "",
+      unit: row.unit ?? "м²",
       stockTotal: parseNumber(row.stock_total ?? "", 0)
-    };
+    } satisfies Product;
   });
 
   return sortByOrder(products);
 }
 
 function normalizeCategories(rows: Array<RawRecord | Category>): Category[] {
-  const categories = rows.map((row) => {
-    if ("heroTitle" in row) {
-      return row;
-    }
+  return sortByOrder(
+    rows.map((row) => {
+      if ("heroTitle" in row) {
+        return row;
+      }
 
-    return {
-      id: row.id ?? "",
-      slug: row.slug ?? "",
-      name: row.name ?? "",
-      description: row.description ?? "",
-      heroTitle: row.hero_title ?? row.name ?? "",
-      heroText: row.hero_text ?? row.description ?? "",
-      image: row.image ?? "",
-      featured: parseBoolean(row.featured ?? ""),
-      sortOrder: parseNumber(row.sort_order, 0),
-      seoTitle: row.seo_title ?? row.name ?? "",
-      seoDescription: row.seo_description ?? row.description ?? ""
-    };
-  });
-
-  return sortByOrder(categories);
+      return {
+        id: row.id ?? "",
+        slug: row.slug ?? "",
+        name: row.name ?? "",
+        description: row.description ?? "",
+        heroTitle: row.hero_title ?? row.name ?? "",
+        heroText: row.hero_text ?? row.description ?? "",
+        image: row.image ?? fallbackImage,
+        featured: parseBoolean(row.featured ?? ""),
+        sortOrder: parseNumber(row.sort_order, 0),
+        seoTitle: row.seo_title ?? row.name ?? "",
+        seoDescription: row.seo_description ?? row.description ?? ""
+      };
+    })
+  );
 }
 
 function normalizePages(rows: Array<RawRecord | PageEntry>): PageEntry[] {
@@ -431,8 +518,7 @@ function normalizeSettings(input: RawRecord[] | Settings): Settings {
     currency: row.currency ?? "₽",
     defaultWastePercent: parseNumber(row.default_waste_percent, 10),
     mapLink: row.map_link ?? "",
-    mapEmbedUrl:
-      row.map_embed_url ?? `https://yandex.ru/map-widget/v1/?text=${encodeURIComponent(address)}&z=16`,
+    mapEmbedUrl: row.map_embed_url ?? `https://yandex.ru/map-widget/v1/?text=${encodeURIComponent(address)}&z=16`,
     socialLinks: splitPipePairs(row.social_links ?? "")
   };
 }
@@ -451,85 +537,59 @@ function loadLocalData(): SiteData {
   };
 }
 
-async function loadRemoteCatalogData(): Promise<SiteData> {
-  const sheetResults = await Promise.all(
-    SHEET_KEYS.map(async (key) => {
+async function loadOptionalRemoteRows(): Promise<Partial<Record<OptionalSheetKey, RawRecord[]>>> {
+  const results = await Promise.all(
+    OPTIONAL_SHEET_KEYS.map(async (key) => {
       const gid = env[getSheetEnvKey(key)];
-      if (!gid) {
-        return [key, null] as const;
-      }
-      return [key, await fetchSheetRows(gid)] as const;
-    })
-  );
-
-  const dataMap = Object.fromEntries(sheetResults) as Partial<Record<(typeof SHEET_KEYS)[number], RawRecord[] | null>>;
-  const creatives = normalizeCreatives((dataMap.CREATIVES ?? []) as RawRecord[]);
-  const products = normalizeProducts((dataMap.PRODUCTS ?? []) as RawRecord[], creatives);
-  const categoriesRows = (dataMap.CATEGORIES ?? []) as RawRecord[];
-  const categories = categoriesRows.length > 0 ? normalizeCategories(categoriesRows) : buildCategoriesFromProducts(products);
-
-  return {
-    creatives,
-    products,
-    categories,
-    pages: normalizePages((dataMap.PAGES ?? []) as RawRecord[]),
-    faq: normalizeFaq((dataMap.FAQ ?? []) as RawRecord[]),
-    seo: normalizeSeo((dataMap.SEO ?? []) as RawRecord[]),
-    settings: normalizeSettings(((dataMap.SETTINGS ?? []) as RawRecord[]) || [])
-  };
-}
-
-async function loadRemoteStockReportData(): Promise<SiteData> {
-  let products: Product[] = [];
-  const localXlsxPath = getLocalXlsxPath();
-
-  if (existsSync(localXlsxPath)) {
-    const rows = await readXlsxRows(localXlsxPath);
-    products = buildStockReportProducts(rows);
-  } else if (env.GOOGLE_SHEETS_PRODUCTS_GID) {
-    const productsCsv = await fetchSheetCsv(env.GOOGLE_SHEETS_PRODUCTS_GID);
-    products = buildStockReportProducts(parseCsvRows(productsCsv));
-  } else {
-    products = normalizeProducts(productsJson as Product[], normalizeCreatives(creativesJson as Creative[]));
-  }
-
-  const categories = buildCategoriesFromProducts(products);
-
-  const optionalRows = await Promise.all(
-    ["PAGES", "FAQ", "SEO", "SETTINGS"].map(async (key) => {
-      const gid = env[getSheetEnvKey(key as (typeof SHEET_KEYS)[number])];
       if (!gid) {
         return [key, []] as const;
       }
+
       return [key, await fetchSheetRows(gid)] as const;
     })
   );
 
-  const dataMap = Object.fromEntries(optionalRows) as Record<string, RawRecord[]>;
+  return Object.fromEntries(results) as Partial<Record<OptionalSheetKey, RawRecord[]>>;
+}
+
+async function loadProductsFromSource(): Promise<Product[]> {
+  if (hasLocalCatalogFile()) {
+    return buildProductsFromRows(await readXlsxRows(getLocalXlsxPath()));
+  }
+
+  if (isGoogleSheetsConfigured() && env.GOOGLE_SHEETS_PRODUCTS_GID) {
+    const csv = await fetchSheetCsv(env.GOOGLE_SHEETS_PRODUCTS_GID);
+    return buildProductsFromRows(parseCsvRows(csv));
+  }
+
+  const sampleCreatives = normalizeCreatives(creativesJson as Creative[]);
+  return normalizeProducts(productsJson as Product[], sampleCreatives);
+}
+
+async function loadRemoteOrLocalCatalog(): Promise<SiteData> {
+  const base = loadLocalData();
+  const products = await loadProductsFromSource();
+  const categories = products.length > 0 ? buildCategoriesFromProducts(products) : base.categories;
+
+  let optionalRows: Partial<Record<OptionalSheetKey, RawRecord[]>> = {};
+  if (isGoogleSheetsConfigured()) {
+    optionalRows = await loadOptionalRemoteRows();
+  }
 
   return {
     creatives: [],
     products,
     categories,
-    pages: dataMap.PAGES?.length ? normalizePages(dataMap.PAGES) : loadLocalData().pages,
-    faq: dataMap.FAQ?.length ? normalizeFaq(dataMap.FAQ) : loadLocalData().faq,
-    seo: dataMap.SEO?.length ? normalizeSeo(dataMap.SEO) : loadLocalData().seo,
-    settings: dataMap.SETTINGS?.length ? normalizeSettings(dataMap.SETTINGS) : loadLocalData().settings
+    pages: optionalRows.PAGES?.length ? normalizePages(optionalRows.PAGES) : base.pages,
+    faq: optionalRows.FAQ?.length ? normalizeFaq(optionalRows.FAQ) : base.faq,
+    seo: optionalRows.SEO?.length ? normalizeSeo(optionalRows.SEO) : base.seo,
+    settings: optionalRows.SETTINGS?.length ? normalizeSettings(optionalRows.SETTINGS) : base.settings
   };
-}
-
-async function loadRemoteData(): Promise<SiteData> {
-  const format = getProductsFormat();
-  if (format === "stock_report") {
-    return loadRemoteStockReportData();
-  }
-
-  return loadRemoteCatalogData();
 }
 
 export async function getSiteData(): Promise<SiteData> {
   if (!siteDataCache) {
-    siteDataCache = isRemoteConfigured() ? loadRemoteData().catch(() => loadLocalData()) : Promise.resolve(loadLocalData());
+    siteDataCache = loadRemoteOrLocalCatalog().catch(() => loadLocalData());
   }
 
   return siteDataCache;
